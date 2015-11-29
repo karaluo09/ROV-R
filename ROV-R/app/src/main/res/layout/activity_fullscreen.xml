@@ -14,10 +14,25 @@
         android:text="@string/dummy_content" />
 
 	
-    <LinearLayout android:orientation="vertical" android:layout_height="fill_parent" android:layout_width="fill_parent">
-    <LinearLayout android:layout_weight="1" android:layout_height="fill_parent" android:layout_width="fill_parent"/>
-    <LinearLayout android:layout_weight="1" android:layout_height="fill_parent" android:layout_width="fill_parent"/>
+    <LinearLayout android:orientation="horizontal" android:layout_height="fill_parent" android:layout_width="fill_parent">
+    <LinearLayout android:layout_weight="1" android:layout_height="fill_parent" android:layout_width="fill_parent">
+        <VideoView
+            android:id="@+id/leftEye"
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            android:layout_centerInParent="true" />
     </LinearLayout>
+    <LinearLayout android:layout_weight="1" android:layout_height="fill_parent" android:layout_width="fill_parent">
+        <VideoView
+            android:id="@+id/rightEye"
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            android:layout_centerInParent="true" />
+    </LinearLayout>
+    </LinearLayout>
+
+
+
 
     <!-- This FrameLayout insets its children based on system windows using
          android:fitsSystemWindows. -->
