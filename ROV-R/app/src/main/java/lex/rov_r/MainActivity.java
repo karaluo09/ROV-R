@@ -1,13 +1,20 @@
-package lex.rov_r;
+/*
+ * Copyright 2014 Google Inc. All Rights Reserved.
 
-import android.app.Activity;
-import android.app.ProgressDialog;
-import android.graphics.PixelFormat;
-import android.media.MediaPlayer;
-import android.net.Uri;
-import android.os.Bundle;
-import android.util.Log;
-import android.widget.VideoView;
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package lex.rov_r;
 
 import com.google.vrtoolkit.cardboard.CardboardActivity;
 import com.google.vrtoolkit.cardboard.CardboardView;
@@ -15,28 +22,68 @@ import com.google.vrtoolkit.cardboard.Eye;
 import com.google.vrtoolkit.cardboard.HeadTransform;
 import com.google.vrtoolkit.cardboard.Viewport;
 
+import android.content.Context;
+import android.opengl.GLES20;
+import android.opengl.Matrix;
+import android.os.Bundle;
+import android.os.Vibrator;
+import android.util.Log;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
+
 import javax.microedition.khronos.egl.EGLConfig;
 
+import lex.rov_r.R;
+
+/**
+ * A Cardboard sample application.
+ */
 public class MainActivity extends CardboardActivity implements CardboardView.StereoRenderer {
-    private final static String videoPath = "http://www.html5tutorial.info/media/html5iscool.mp4";
-    private static ProgressDialog progressDialog;
-    VideoView videoView_left;
-    VideoView videoView_right;
+
     private static final String TAG = "MainActivity";
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_fullscreen);
+    private Vibrator vibrator;
+    private CardboardVideoView overlayView;
 
-        videoView_left = (VideoView) findViewById(R.id.leftEye);
-        videoView_right = (VideoView) findViewById(R.id.rightEye);
-
-        progressDialog = ProgressDialog.show(MainActivity.this, "", "Buffering video...", true);
-        progressDialog.setCancelable(true);
-
-        PlayVideo();
+    /**
+     * Checks if we've had an error inside of OpenGL ES, and if so what that error is.
+     *
+     * @param label Label to report in case of error.
+     */
+    private static void checkGLError(String label) {
+        int error;
+        while ((error = GLES20.glGetError()) != GLES20.GL_NO_ERROR) {
+            Log.e(TAG, label + ": glError " + error);
+            throw new RuntimeException(label + ": glError " + error);
+        }
     }
+
+    /**
+     * Sets the view to our CardboardView and initializes the transformation matrices we will use
+     * to render our scene.
+     */
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+
+        setContentView(R.layout.common_ui);
+        CardboardView cardboardView = (CardboardView) findViewById(R.id.cardboard_view);
+        cardboardView.setRestoreGLStateEnabled(false);
+        cardboardView.setRenderer(this);
+        setCardboardView(cardboardView);
+
+        vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+
+
+        overlayView = (CardboardVideoView) findViewById(R.id.overlay);
+    }
+
     @Override
     public void onRendererShutdown() {
         Log.i(TAG, "onRendererShutdown");
@@ -47,59 +94,55 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
         Log.i(TAG, "onSurfaceChanged");
     }
 
+    /**
+     * Creates the buffers we use to store information about the 3D world.
+     *
+     * <p>OpenGL doesn't use Java arrays, but rather needs data in a format it can understand.
+     * Hence we use ByteBuffers.
+     *
+     * @param config The EGL configuration used when creating the surface.
+     */
     @Override
     public void onSurfaceCreated(EGLConfig config) {
         Log.i(TAG, "onSurfaceCreated");
+        GLES20.glClearColor(1f, 1f, 1f, 0.5f); // Dark background so text shows up well.
+
+        checkGLError("onSurfaceCreated");
     }
+
+    /**
+     * Prepares OpenGL ES before we draw a frame.
+     *
+     * @param headTransform The head transformation in the new frame.
+     */
     @Override
     public void onNewFrame(HeadTransform headTransform) {
-
+        checkGLError("onReadyToDraw");
     }
+
+    /**
+     * Draws a frame for an eye.
+     *
+     * @param eye The eye to render. Includes all required transformations.
+     */
     @Override
     public void onDrawEye(Eye eye) {
-
     }
 
     @Override
     public void onFinishFrame(Viewport viewport) {
     }
 
+    /**
+     * Called when the Cardboard trigger is pulled.
+     */
     @Override
     public void onCardboardTrigger() {
+        Log.i(TAG, "onCardboardTrigger");
 
-    }
+//        overlayView.show3DToast("Shiver me timbers!");
 
-    private void PlayVideo() {
-        try {
-            getWindow().setFormat(PixelFormat.TRANSLUCENT);
-
-            Uri video = Uri.parse(videoPath);
-            videoView_left.setVideoURI(video);
-            videoView_right.setVideoURI(video);
-            videoView_left.requestFocus();
-            videoView_right.requestFocus();
-            videoView_left.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
-
-                public void onPrepared(MediaPlayer mp) {
-                    progressDialog.dismiss();
-                    videoView_left.start();
-                }
-            });
-
-            videoView_right.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
-
-                public void onPrepared(MediaPlayer mp) {
-                    progressDialog.dismiss();
-                    videoView_right.start();
-                }
-            });
-
-
-        } catch (Exception e) {
-            progressDialog.dismiss();
-            System.out.println("Video Play Error :" + e.toString());
-            finish();
-        }
-
+        // Always give user feedback.
+        vibrator.vibrate(50);
     }
 }
