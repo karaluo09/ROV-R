@@ -24,22 +24,11 @@ import com.google.vrtoolkit.cardboard.Viewport;
 
 import android.content.Context;
 import android.opengl.GLES20;
-import android.opengl.Matrix;
 import android.os.Bundle;
 import android.os.Vibrator;
 import android.util.Log;
 import android.view.InputDevice;
 import android.view.MotionEvent;
-
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.lang.reflect.Array;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.FloatBuffer;
-import java.util.ArrayList;
 
 import javax.microedition.khronos.egl.EGLConfig;
 
@@ -51,9 +40,15 @@ import lex.rov_r.R;
 public class MainActivity extends CardboardActivity implements CardboardView.StereoRenderer {
 
     private static final String TAG = "MainActivity";
+    private float[] headView;
 
     private Vibrator vibrator;
     private CardboardVideoView overlayView;
+    private double x;
+    private double y;
+    private double z;
+    private double rz;
+
 
     /**
      * Checks if we've had an error inside of OpenGL ES, and if so what that error is.
@@ -84,7 +79,6 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
 
         vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
 
-
         overlayView = (CardboardVideoView) findViewById(R.id.overlay);
     }
 
@@ -110,7 +104,6 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
     public void onSurfaceCreated(EGLConfig config) {
         Log.i(TAG, "onSurfaceCreated");
         GLES20.glClearColor(1f, 1f, 1f, 0.5f); // Dark background so text shows up well.
-
         checkGLError("onSurfaceCreated");
     }
 
@@ -121,6 +114,7 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
      */
     @Override
     public void onNewFrame(HeadTransform headTransform) {
+        headTransform.getHeadView(headView, 0);
         checkGLError("onReadyToDraw");
     }
 
@@ -131,6 +125,10 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
      */
     @Override
     public void onDrawEye(Eye eye) {
+        //rotate camera
+        float pitch = (float) Math.atan2(headView[1], -headView[2]);
+        float yaw = (float) Math.atan2(headView[0], -headView[2]);
+        //stream video
     }
 
     @Override
@@ -144,30 +142,10 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
     public void onCardboardTrigger() {
         Log.i(TAG, "onCardboardTrigger");
 
-//        overlayView.show3DToast("Shiver me timbers!");
+        //overlayView.show3DToast("Shiver me timbers!");
 
         // Always give user feedback.
         vibrator.vibrate(50);
-    }
-
-    public ArrayList getGameControllerIds() {
-        ArrayList gameControllerDeviceIds = new ArrayList();
-        int[] deviceIds = InputDevice.getDeviceIds();
-        for (int deviceId : deviceIds) {
-            InputDevice dev = InputDevice.getDevice(deviceId);
-            int sources = dev.getSources();
-
-            // Verify that the device has gamepad buttons, control sticks, or both.
-            if (((sources & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD)
-                    || ((sources & InputDevice.SOURCE_JOYSTICK)
-                    == InputDevice.SOURCE_JOYSTICK)) {
-                // This device is a game controller. Store its device ID.
-                if (!gameControllerDeviceIds.contains(deviceId)) {
-                    gameControllerDeviceIds.add(deviceId);
-                }
-            }
-        }
-        return gameControllerDeviceIds;
     }
 
     private static float getCenteredAxis(MotionEvent event, InputDevice device, int axis, int historyPos) {
@@ -190,31 +168,39 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
     }
 
     private void processJoystickInput(MotionEvent event, int historyPos) {
-
         InputDevice mInputDevice = event.getDevice();
 
-        // Calculate the horizontal distance to move by
-        // using the input value from one of these physical controls:
-        // the left control stick, hat axis, or the right control stick.
-        float x = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_X, historyPos);
-        if (x == 0) {
-            x = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_HAT_X, historyPos);
-        }
-        if (x == 0) {
-            x = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_Z, historyPos);
-        }
+        x = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_X, historyPos);
+        y = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_Y, historyPos);
+        z = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_Z, historyPos);
+        rz = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_RZ, historyPos);
+    }
 
-        // Calculate the vertical distance to move by
-        // using the input value from one of these physical controls:
-        // the left control stick, hat switch, or the right control stick.
-        float y = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_Y, historyPos);
+    @Override
+    public boolean onGenericMotionEvent(MotionEvent event) {
 
-        if (y == 0) {
-            y = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_HAT_Y, historyPos);
+        // Check that the event came from a game controller
+        if ((event.getSource() & InputDevice.SOURCE_JOYSTICK) ==
+                InputDevice.SOURCE_JOYSTICK &&
+                event.getAction() == MotionEvent.ACTION_MOVE) {
+
+            // Process all historical movement samples in the batch
+            final int historySize = event.getHistorySize();
+
+            // Process the movements starting from the
+            // earliest historical position in the batch
+            for (int i = 0; i < historySize; i++) {
+                // Process the event at historical position i
+                processJoystickInput(event, i);
+            }
+            // Process the current movement sample in the batch (position -1)
+            processJoystickInput(event, -1);
+            Log.i("x", String.valueOf(x));
+            Log.i("y", String.valueOf(y));
+            Log.i("z", String.valueOf(z));
+            Log.i("rz", String.valueOf(rz));
+            return true;
         }
-        if (y == 0) {
-            y = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_RZ, historyPos);
-        }
-        // Update the ship object based on the new x and y values
+        return super.onGenericMotionEvent(event);
     }
 }

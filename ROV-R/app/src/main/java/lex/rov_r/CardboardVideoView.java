@@ -17,11 +17,7 @@
 package lex.rov_r;
 
 import android.content.Context;
-import android.graphics.Color;
-import android.graphics.Typeface;
 import android.util.AttributeSet;
-import android.util.TypedValue;
-import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.AlphaAnimation;
@@ -30,9 +26,7 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.TextView;
 
 /**
  * Contains two sub-views to provide a simple stereo HUD.
@@ -96,7 +90,8 @@ public class CardboardVideoView extends LinearLayout {
       webView.setWebViewClient(new WebViewClient());
       WebSettings webSettings = webView.getSettings();
       webSettings.setJavaScriptEnabled(true);
-      webView.loadUrl("https://www.youtube.com/embed/Z1agHAa6eG8");
+      webSettings.setSupportZoom(true);
+      webView.loadUrl("http://10.1.31.77:8081/");
       addView(webView);
     }
 
