@@ -91,7 +91,7 @@ public class CardboardVideoView extends LinearLayout {
       WebSettings webSettings = webView.getSettings();
       webSettings.setJavaScriptEnabled(true);
       webSettings.setSupportZoom(true);
-      webView.loadUrl("http://10.1.31.77:8081/");
+      webView.loadUrl("file:///android_asset/rovr.html");
       addView(webView);
     }
 
@@ -99,6 +99,7 @@ public class CardboardVideoView extends LinearLayout {
     public void setOffset(float offset) {
       this.offset = offset;
     }
+
 
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {

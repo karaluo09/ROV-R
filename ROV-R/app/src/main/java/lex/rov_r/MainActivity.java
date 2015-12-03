@@ -30,6 +30,9 @@ import android.util.Log;
 import android.view.InputDevice;
 import android.view.MotionEvent;
 
+import java.io.*;
+import java.net.*;
+
 import javax.microedition.khronos.egl.EGLConfig;
 
 import lex.rov_r.R;
@@ -48,20 +51,8 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
     private double y;
     private double z;
     private double rz;
-
-
-    /**
-     * Checks if we've had an error inside of OpenGL ES, and if so what that error is.
-     *
-     * @param label Label to report in case of error.
-     */
-    private static void checkGLError(String label) {
-        int error;
-        while ((error = GLES20.glGetError()) != GLES20.GL_NO_ERROR) {
-            Log.e(TAG, label + ": glError " + error);
-            throw new RuntimeException(label + ": glError " + error);
-        }
-    }
+    private ServerSocket server;
+    Thread serverThread = null;
 
     /**
      * Sets the view to our CardboardView and initializes the transformation matrices we will use
@@ -78,8 +69,10 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
         setCardboardView(cardboardView);
 
         vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-
         overlayView = (CardboardVideoView) findViewById(R.id.overlay);
+
+        this.serverThread = new Thread(new ServerThread());
+        this.serverThread.start();
     }
 
     @Override
@@ -104,7 +97,6 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
     public void onSurfaceCreated(EGLConfig config) {
         Log.i(TAG, "onSurfaceCreated");
         GLES20.glClearColor(1f, 1f, 1f, 0.5f); // Dark background so text shows up well.
-        checkGLError("onSurfaceCreated");
     }
 
     /**
@@ -115,7 +107,6 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
     @Override
     public void onNewFrame(HeadTransform headTransform) {
         headTransform.getHeadView(headView, 0);
-        checkGLError("onReadyToDraw");
     }
 
     /**
@@ -167,14 +158,14 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
         return 0;
     }
 
-    private void processJoystickInput(MotionEvent event, int historyPos) {
+    private void processJoystickInput(MotionEvent event, int historyPos) throws IOException {
         InputDevice mInputDevice = event.getDevice();
-
         x = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_X, historyPos);
         y = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_Y, historyPos);
         z = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_Z, historyPos);
         rz = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_RZ, historyPos);
     }
+
 
     @Override
     public boolean onGenericMotionEvent(MotionEvent event) {
@@ -191,10 +182,18 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
             // earliest historical position in the batch
             for (int i = 0; i < historySize; i++) {
                 // Process the event at historical position i
-                processJoystickInput(event, i);
+                try {
+                    processJoystickInput(event, i);
+                } catch (IOException ex) {
+                    System.out.println("Error loading history");
+                }
             }
             // Process the current movement sample in the batch (position -1)
-            processJoystickInput(event, -1);
+            try {
+                processJoystickInput(event, -1);
+            } catch (IOException ex) {
+                System.out.println("Error loading current");
+            }
             Log.i("x", String.valueOf(x));
             Log.i("y", String.valueOf(y));
             Log.i("z", String.valueOf(z));
@@ -202,5 +201,60 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
             return true;
         }
         return super.onGenericMotionEvent(event);
+    }
+
+    class ServerThread implements Runnable {
+
+        public void run() {
+            Socket socket = null;
+            try {
+                server = new ServerSocket(8080);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    socket = server.accept();
+
+                    CommunicationThread commThread = new CommunicationThread(socket);
+                    new Thread(commThread).start();
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        class CommunicationThread implements Runnable {
+
+            private Socket clientSocket;
+
+            PrintWriter out;
+
+            public CommunicationThread(Socket clientSocket) {
+
+                this.clientSocket = clientSocket;
+
+                try {
+                    out = new PrintWriter(clientSocket.getOutputStream(), true);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            public void run() {
+
+                while (!Thread.currentThread().isInterrupted()) {
+                    String toClient = String.valueOf(x)+","+String.valueOf(y)+","+String.valueOf(z)+","+String.valueOf(rz);
+                    out.println(toClient);
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+
+        }
     }
 }
