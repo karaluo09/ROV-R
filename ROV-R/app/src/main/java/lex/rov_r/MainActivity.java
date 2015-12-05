@@ -43,14 +43,19 @@ import lex.rov_r.R;
 public class MainActivity extends CardboardActivity implements CardboardView.StereoRenderer {
 
     private static final String TAG = "MainActivity";
-    private float[] headView;
 
     private Vibrator vibrator;
     private CardboardVideoView overlayView;
+
     private double x;
     private double y;
     private double z;
     private double rz;
+    private float yaw;
+    private float roll;
+
+    private float[] headRotate;
+
     private ServerSocket server;
     Thread serverThread = null;
 
@@ -73,6 +78,11 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
 
         this.serverThread = new Thread(new ServerThread());
         this.serverThread.start();
+
+        headRotate = new float[3];
+        headRotate[0] = 0;
+        headRotate[1] = 0;
+        headRotate[2] = 0;
     }
 
     @Override
@@ -106,7 +116,32 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
      */
     @Override
     public void onNewFrame(HeadTransform headTransform) {
-        headTransform.getHeadView(headView, 0);
+        headTransform.getEulerAngles(headRotate, 0);
+        if(headRotate[2]*180/Math.PI>90){
+            headRotate[2]=90;
+        }
+        else if (headRotate[2]*180/Math.PI<-90){
+            headRotate[0]=-90;
+        }
+//        headTransform.getHeadView(headView, 0);
+//        if (headView[0] == 1.0f)
+//        {
+//            (float)yaw = Math.atan2((float)headView[2], (float)headView[11]);
+//            roll = 0;
+//
+//        }else if (headView[0] == -1.0f)
+//        {
+//            yaw = Math.atan2(headView[2], _34);
+//            roll = 0;
+//        }else
+//        {
+//
+//            yaw = Math.atan2(-_31,_11);
+//            roll = Math.atan2(-_23,_22);
+//        }
+//        float roll = (float) Math.atan2();
+//        float yaw = (float) Math.atan2(objPositionVec[0], -objPositionVec[2]);
+
     }
 
     /**
@@ -116,10 +151,6 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
      */
     @Override
     public void onDrawEye(Eye eye) {
-        //rotate camera
-        float pitch = (float) Math.atan2(headView[1], -headView[2]);
-        float yaw = (float) Math.atan2(headView[0], -headView[2]);
-        //stream video
     }
 
     @Override
@@ -245,7 +276,7 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
             public void run() {
 
                 while (!Thread.currentThread().isInterrupted()) {
-                    String toClient = String.valueOf(x)+","+String.valueOf(y)+","+String.valueOf(z)+","+String.valueOf(rz);
+                    String toClient = String.valueOf(x)+","+String.valueOf(y)+","+String.valueOf(z)+","+String.valueOf(rz);//+","+String.valueOf(headRotate[0]*180/(2*Math.PI)+90)+","+String.valueOf(headRotate[2]+90);
                     out.println(toClient);
                     try {
                         Thread.sleep(100);
@@ -253,6 +284,7 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
                         e.printStackTrace();
                     }
                 }
+
             }
 
         }
