@@ -74,12 +74,6 @@ public class CardboardVideoView extends LinearLayout {
   }
 
 
-  /**
-   * A simple view group containing some horizontally centered text underneath a horizontally
-   * centered image.
-   *
-   * <p>This is a helper class for CardboardOverlayView.
-   */
   private class CardboardOverlayEyeView extends ViewGroup {
     private final WebView webView;
     private float offset;
