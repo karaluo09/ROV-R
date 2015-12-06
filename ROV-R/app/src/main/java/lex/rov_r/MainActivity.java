@@ -35,6 +35,14 @@ import java.net.*;
 
 import javax.microedition.khronos.egl.EGLConfig;
 
+/**
+ * Main class for our Android application. Handles joystick input, displaying video to the Google Cardboard,
+ * and head tracking.
+ *
+ * Cardboard related code adapted from Google's Demo: https://developers.google.com/cardboard/android/get-started
+ * Gamepad related code adapted from Google's API docs: http://developer.android.com/training/game-controllers/controller-input.html
+ * Networking code adapted from: http://examples.javacodegeeks.com/android/core/socket-core/android-socket-example/
+ */
 public class MainActivity extends CardboardActivity implements CardboardView.StereoRenderer {
 
     private static final String TAG = "MainActivity";
