@@ -117,31 +117,12 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
     @Override
     public void onNewFrame(HeadTransform headTransform) {
         headTransform.getEulerAngles(headRotate, 0);
-        if(headRotate[2]*180/Math.PI>90){
-            headRotate[2]=90;
+        if(headRotate[1]>Math.PI/2){
+            headRotate[1]=(float)Math.PI/2;
         }
-        else if (headRotate[2]*180/Math.PI<-90){
-            headRotate[0]=-90;
+        else if (headRotate[1]<-Math.PI/2){
+            headRotate[1]=(float)-Math.PI/2;
         }
-//        headTransform.getHeadView(headView, 0);
-//        if (headView[0] == 1.0f)
-//        {
-//            (float)yaw = Math.atan2((float)headView[2], (float)headView[11]);
-//            roll = 0;
-//
-//        }else if (headView[0] == -1.0f)
-//        {
-//            yaw = Math.atan2(headView[2], _34);
-//            roll = 0;
-//        }else
-//        {
-//
-//            yaw = Math.atan2(-_31,_11);
-//            roll = Math.atan2(-_23,_22);
-//        }
-//        float roll = (float) Math.atan2();
-//        float yaw = (float) Math.atan2(objPositionVec[0], -objPositionVec[2]);
-
     }
 
     /**
@@ -196,7 +177,6 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
         z = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_Z, historyPos);
         rz = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_RZ, historyPos);
     }
-
 
     @Override
     public boolean onGenericMotionEvent(MotionEvent event) {
@@ -276,7 +256,12 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
             public void run() {
 
                 while (!Thread.currentThread().isInterrupted()) {
-                    String toClient = String.valueOf(x)+","+String.valueOf(y)+","+String.valueOf(z)+","+String.valueOf(rz);//+","+String.valueOf(headRotate[0]*180/(2*Math.PI)+90)+","+String.valueOf(headRotate[2]+90);
+                    String toClient = String.valueOf(x)+","+
+                            String.valueOf(y)+","+
+                            String.valueOf(z)+","+
+                            String.valueOf(rz)+","+
+                            String.valueOf(headRotate[0]*180/(Math.PI)+90)+","+
+                            String.valueOf(headRotate[1]*180/(Math.PI)+90);
                     out.println(toClient);
                     try {
                         Thread.sleep(100);

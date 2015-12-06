@@ -1,6 +1,16 @@
 <head>
 	<meta name="viewport" content="width=device-width, minimum-scale=0.1">
+	<style>
+	</style>
+	<script type="text/javascript">
+		window.addEventListener("keydown", function(e) {
+    		// spacevf, page up, page down and arrow keys:
+    		if([32, 33, 34, 37, 38, 39, 40].indexOf(e.keyCode) > -1) {
+        		e.preventDefault();
+    		}
+		}, false);
+	</script>
 </head>
 <body style="margin: 0px;">
-	<img style="-webkit-user-select: none" height="100%" src="http://10.1.31.77:8081/">
+		<img style="-webkit-user-select: none" height="100%" src="http://192.168.1.222:8081/">
 </body>

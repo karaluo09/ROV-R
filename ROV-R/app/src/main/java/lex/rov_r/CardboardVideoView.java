@@ -18,6 +18,7 @@ package lex.rov_r;
 
 import android.content.Context;
 import android.util.AttributeSet;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.AlphaAnimation;
@@ -90,11 +91,10 @@ public class CardboardVideoView extends LinearLayout {
       webView.setWebViewClient(new WebViewClient());
       WebSettings webSettings = webView.getSettings();
       webSettings.setJavaScriptEnabled(true);
-      webSettings.setSupportZoom(true);
+      webSettings.setSupportZoom(false);
       webView.loadUrl("file:///android_asset/rovr.html");
       addView(webView);
     }
-
 
     public void setOffset(float offset) {
       this.offset = offset;
