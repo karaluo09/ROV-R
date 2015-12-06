@@ -41,14 +41,19 @@ import javax.microedition.khronos.egl.EGLConfig;
 public class MainActivity extends CardboardActivity implements CardboardView.StereoRenderer {
 
     private static final String TAG = "MainActivity";
-    private float[] headView;
 
     private Vibrator vibrator;
     private CardboardVideoView overlayView;
+
     private double x;
     private double y;
     private double z;
     private double rz;
+    private float yaw;
+    private float roll;
+
+    private float[] headRotate;
+
     private ServerSocket server;
     Thread serverThread = null;
 
@@ -78,6 +83,11 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
         // start HTTP socket server thread
         this.serverThread = new Thread(new ServerThread());
         this.serverThread.start();
+
+        headRotate = new float[3];
+        headRotate[0] = 0;
+        headRotate[1] = 0;
+        headRotate[2] = 0;
     }
 
     @Override
@@ -111,8 +121,13 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
      */
     @Override
     public void onNewFrame(HeadTransform headTransform) {
-        // stores head position data in headView as it's available
-        headTransform.getHeadView(headView, 0);
+        headTransform.getEulerAngles(headRotate, 0);
+        if(headRotate[1]>Math.PI/2){
+            headRotate[1]=(float)Math.PI/2;
+        }
+        else if (headRotate[1]<-Math.PI/2){
+            headRotate[1]=(float)-Math.PI/2;
+        }
     }
 
     /**
@@ -122,9 +137,6 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
      */
     @Override
     public void onDrawEye(Eye eye) {
-        // calculates pitch and yaw from head position data
-        float pitch = (float) Math.atan2(headView[1], -headView[2]);
-        float yaw = (float) Math.atan2(headView[0], -headView[2]);
     }
 
     @Override
@@ -171,7 +183,6 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
         z = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_Z, historyPos);
         rz = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_RZ, historyPos);
     }
-
 
     @Override
     public boolean onGenericMotionEvent(MotionEvent event) {
@@ -261,7 +272,9 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
                     String toClient = String.valueOf(x)+","+
                             String.valueOf(y)+","+
                             String.valueOf(z)+","+
-                            String.valueOf(rz);
+                            String.valueOf(rz)+","+
+                            String.valueOf(headRotate[0]*180/(Math.PI)+90)+","+
+                            String.valueOf(headRotate[1]*180/(Math.PI)+90);
                     out.println(toClient);
                     try {
                         Thread.sleep(100);
@@ -269,6 +282,7 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
                         e.printStackTrace();
                     }
                 }
+
             }
 
         }
