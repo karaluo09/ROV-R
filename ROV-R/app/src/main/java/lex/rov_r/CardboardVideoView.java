@@ -33,14 +33,15 @@ import android.widget.LinearLayout;
  * Contains two sub-views to provide a simple stereo HUD.
  */
 public class CardboardVideoView extends LinearLayout {
+  // stores an overlayeyeview for each side
   private final CardboardOverlayEyeView leftView;
   private final CardboardOverlayEyeView rightView;
-  private AlphaAnimation textFadeAnimation;
 
   public CardboardVideoView(Context context, AttributeSet attrs) {
     super(context, attrs);
     setOrientation(HORIZONTAL);
 
+    // build layout using a linear layout, setting each side's overlayeyeview to fill one-half the screen
     LayoutParams params = new LayoutParams(
       LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT, 1.0f);
     params.setMargins(0, 0, 0, 0);
@@ -56,9 +57,6 @@ public class CardboardVideoView extends LinearLayout {
     // Set some reasonable defaults.
     setDepthOffset(0.01f);
     setVisibility(View.VISIBLE);
-
-    textFadeAnimation = new AlphaAnimation(1.0f, 0.0f);
-    textFadeAnimation.setDuration(5000);
   }
 
   private abstract class EndAnimationListener implements Animation.AnimationListener {
@@ -80,13 +78,19 @@ public class CardboardVideoView extends LinearLayout {
 
     public CardboardOverlayEyeView(Context context, AttributeSet attrs) {
       super(context, attrs);
+
+      // initialize webview
       webView = new WebView(context, attrs);
       webView.setWebChromeClient(new WebChromeClient());
       webView.setWebViewClient(new WebViewClient());
       WebSettings webSettings = webView.getSettings();
       webSettings.setJavaScriptEnabled(true);
       webSettings.setSupportZoom(false);
+
+      // load rovr.html into webview to display live video feed
       webView.loadUrl("file:///android_asset/rovr.html");
+
+      // add this webview to the overlayeyeview
       addView(webView);
     }
 

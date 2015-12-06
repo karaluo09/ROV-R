@@ -35,26 +35,27 @@ import java.net.*;
 
 import javax.microedition.khronos.egl.EGLConfig;
 
-/**
- * A Cardboard sample application.
- */
 public class MainActivity extends CardboardActivity implements CardboardView.StereoRenderer {
 
     private static final String TAG = "MainActivity";
 
+    // store reference to vibration motor
     private Vibrator vibrator;
+
+    // store reference to CardboardVideoView
     private CardboardVideoView overlayView;
 
+    // global variables for head-tracking/joystick data
     private double x;
     private double y;
     private double z;
     private double rz;
-    private float yaw;
-    private float roll;
-
     private float[] headRotate;
 
+    // store reference to server socket
     private ServerSocket server;
+
+    // store reference to server thread
     Thread serverThread = null;
 
     /**
@@ -84,6 +85,7 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
         this.serverThread = new Thread(new ServerThread());
         this.serverThread.start();
 
+        // initialize array to store head rotation data
         headRotate = new float[3];
         headRotate[0] = 0;
         headRotate[1] = 0;
@@ -111,7 +113,7 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
     @Override
     public void onSurfaceCreated(EGLConfig config) {
         Log.i(TAG, "onSurfaceCreated");
-        GLES20.glClearColor(1f, 1f, 1f, 0.5f); // Dark background so text shows up well.
+        GLES20.glClearColor(1f, 1f, 1f, 0.5f);
     }
 
     /**
@@ -121,7 +123,10 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
      */
     @Override
     public void onNewFrame(HeadTransform headTransform) {
+        // get euler angles from latest head rotation data
         headTransform.getEulerAngles(headRotate, 0);
+
+        // cap angles between -90 and 90 degrees (max range of the servos)
         if(headRotate[1]>Math.PI/2){
             headRotate[1]=(float)Math.PI/2;
         }
@@ -211,6 +216,8 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
             } catch (IOException ex) {
                 System.out.println("Error loading current");
             }
+
+            // log joystick values for debugging
             Log.i("x", String.valueOf(x));
             Log.i("y", String.valueOf(y));
             Log.i("z", String.valueOf(z));
@@ -257,9 +264,11 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
             PrintWriter out;
 
             public CommunicationThread(Socket clientSocket) {
+                // asigns reference to the socket connection
                 this.clientSocket = clientSocket;
 
                 try {
+                    // initialize printwriter to output to the client
                     out = new PrintWriter(clientSocket.getOutputStream(), true);
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -269,13 +278,18 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
             public void run() {
 
                 while (!Thread.currentThread().isInterrupted()) {
+                    // build comma-delimited string with joystick and head tracking data
                     String toClient = String.valueOf(x)+","+
                             String.valueOf(y)+","+
                             String.valueOf(z)+","+
                             String.valueOf(rz)+","+
                             String.valueOf(headRotate[0]*180/(Math.PI)+90)+","+
                             String.valueOf(headRotate[1]*180/(Math.PI)+90);
+
+                    // write string to client
                     out.println(toClient);
+
+                    // sleep thread for 100ms before sending new data
                     try {
                         Thread.sleep(100);
                     } catch (InterruptedException e) {
