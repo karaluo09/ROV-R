@@ -35,8 +35,6 @@ import java.net.*;
 
 import javax.microedition.khronos.egl.EGLConfig;
 
-import lex.rov_r.R;
-
 /**
  * A Cardboard sample application.
  */
@@ -62,15 +60,22 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        // load layout from XML
         setContentView(R.layout.common_ui);
+
+        // initialize cardboardview as per Google Cardboard SDK instructions
         CardboardView cardboardView = (CardboardView) findViewById(R.id.cardboard_view);
         cardboardView.setRestoreGLStateEnabled(false);
         cardboardView.setRenderer(this);
         setCardboardView(cardboardView);
 
+        // initialize reference to device vibration motors
         vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+
+        // initialize reference to cardboardvideoview
         overlayView = (CardboardVideoView) findViewById(R.id.overlay);
 
+        // start HTTP socket server thread
         this.serverThread = new Thread(new ServerThread());
         this.serverThread.start();
     }
@@ -106,6 +111,7 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
      */
     @Override
     public void onNewFrame(HeadTransform headTransform) {
+        // stores head position data in headView as it's available
         headTransform.getHeadView(headView, 0);
     }
 
@@ -116,10 +122,9 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
      */
     @Override
     public void onDrawEye(Eye eye) {
-        //rotate camera
+        // calculates pitch and yaw from head position data
         float pitch = (float) Math.atan2(headView[1], -headView[2]);
         float yaw = (float) Math.atan2(headView[0], -headView[2]);
-        //stream video
     }
 
     @Override
@@ -133,9 +138,7 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
     public void onCardboardTrigger() {
         Log.i(TAG, "onCardboardTrigger");
 
-        //overlayView.show3DToast("Shiver me timbers!");
-
-        // Always give user feedback.
+        // vibrate to signify that trigger has been activated (current no use, just for debug purposes)
         vibrator.vibrate(50);
     }
 
@@ -159,7 +162,10 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
     }
 
     private void processJoystickInput(MotionEvent event, int historyPos) throws IOException {
+        // get device that created motionevent
         InputDevice mInputDevice = event.getDevice();
+
+        // store data for each joystick axis
         x = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_X, historyPos);
         y = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_Y, historyPos);
         z = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_Z, historyPos);
@@ -206,16 +212,23 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
     class ServerThread implements Runnable {
 
         public void run() {
+            // stores reference to socket connection
             Socket socket = null;
+
+            // initialize socket server on port 8080
             try {
                 server = new ServerSocket(8080);
             } catch (IOException e) {
                 e.printStackTrace();
             }
+
+            // loop until thread killed, waiting for connection from client
             while (!Thread.currentThread().isInterrupted()) {
                 try {
+                    // accept connection from client if one is requested
                     socket = server.accept();
 
+                    // start a new communication thread to send data to the client
                     CommunicationThread commThread = new CommunicationThread(socket);
                     new Thread(commThread).start();
 
@@ -226,13 +239,13 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
         }
 
         class CommunicationThread implements Runnable {
-
+            // stores reference to socket connection
             private Socket clientSocket;
 
+            // stores reference to printwriter for outputting to the client
             PrintWriter out;
 
             public CommunicationThread(Socket clientSocket) {
-
                 this.clientSocket = clientSocket;
 
                 try {
@@ -245,7 +258,10 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
             public void run() {
 
                 while (!Thread.currentThread().isInterrupted()) {
-                    String toClient = String.valueOf(x)+","+String.valueOf(y)+","+String.valueOf(z)+","+String.valueOf(rz);
+                    String toClient = String.valueOf(x)+","+
+                            String.valueOf(y)+","+
+                            String.valueOf(z)+","+
+                            String.valueOf(rz);
                     out.println(toClient);
                     try {
                         Thread.sleep(100);
