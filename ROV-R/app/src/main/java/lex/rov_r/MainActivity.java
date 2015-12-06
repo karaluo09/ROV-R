@@ -24,22 +24,14 @@ import com.google.vrtoolkit.cardboard.Viewport;
 
 import android.content.Context;
 import android.opengl.GLES20;
-import android.opengl.Matrix;
 import android.os.Bundle;
 import android.os.Vibrator;
 import android.util.Log;
 import android.view.InputDevice;
 import android.view.MotionEvent;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.lang.reflect.Array;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.FloatBuffer;
-import java.util.ArrayList;
+import java.io.*;
+import java.net.*;
 
 import javax.microedition.khronos.egl.EGLConfig;
 
@@ -55,18 +47,17 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
     private Vibrator vibrator;
     private CardboardVideoView overlayView;
 
-    /**
-     * Checks if we've had an error inside of OpenGL ES, and if so what that error is.
-     *
-     * @param label Label to report in case of error.
-     */
-    private static void checkGLError(String label) {
-        int error;
-        while ((error = GLES20.glGetError()) != GLES20.GL_NO_ERROR) {
-            Log.e(TAG, label + ": glError " + error);
-            throw new RuntimeException(label + ": glError " + error);
-        }
-    }
+    private double x;
+    private double y;
+    private double z;
+    private double rz;
+    private float yaw;
+    private float roll;
+
+    private float[] headRotate;
+
+    private ServerSocket server;
+    Thread serverThread = null;
 
     /**
      * Sets the view to our CardboardView and initializes the transformation matrices we will use
@@ -83,9 +74,15 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
         setCardboardView(cardboardView);
 
         vibrator = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
-
-
         overlayView = (CardboardVideoView) findViewById(R.id.overlay);
+
+        this.serverThread = new Thread(new ServerThread());
+        this.serverThread.start();
+
+        headRotate = new float[3];
+        headRotate[0] = 0;
+        headRotate[1] = 0;
+        headRotate[2] = 0;
     }
 
     @Override
@@ -110,8 +107,6 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
     public void onSurfaceCreated(EGLConfig config) {
         Log.i(TAG, "onSurfaceCreated");
         GLES20.glClearColor(1f, 1f, 1f, 0.5f); // Dark background so text shows up well.
-
-        checkGLError("onSurfaceCreated");
     }
 
     /**
@@ -121,7 +116,13 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
      */
     @Override
     public void onNewFrame(HeadTransform headTransform) {
-        checkGLError("onReadyToDraw");
+        headTransform.getEulerAngles(headRotate, 0);
+        if(headRotate[1]>Math.PI/2){
+            headRotate[1]=(float)Math.PI/2;
+        }
+        else if (headRotate[1]<-Math.PI/2){
+            headRotate[1]=(float)-Math.PI/2;
+        }
     }
 
     /**
@@ -144,30 +145,10 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
     public void onCardboardTrigger() {
         Log.i(TAG, "onCardboardTrigger");
 
-//        overlayView.show3DToast("Shiver me timbers!");
+        //overlayView.show3DToast("Shiver me timbers!");
 
         // Always give user feedback.
         vibrator.vibrate(50);
-    }
-
-    public ArrayList getGameControllerIds() {
-        ArrayList gameControllerDeviceIds = new ArrayList();
-        int[] deviceIds = InputDevice.getDeviceIds();
-        for (int deviceId : deviceIds) {
-            InputDevice dev = InputDevice.getDevice(deviceId);
-            int sources = dev.getSources();
-
-            // Verify that the device has gamepad buttons, control sticks, or both.
-            if (((sources & InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD)
-                    || ((sources & InputDevice.SOURCE_JOYSTICK)
-                    == InputDevice.SOURCE_JOYSTICK)) {
-                // This device is a game controller. Store its device ID.
-                if (!gameControllerDeviceIds.contains(deviceId)) {
-                    gameControllerDeviceIds.add(deviceId);
-                }
-            }
-        }
-        return gameControllerDeviceIds;
     }
 
     private static float getCenteredAxis(MotionEvent event, InputDevice device, int axis, int historyPos) {
@@ -189,32 +170,108 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
         return 0;
     }
 
-    private void processJoystickInput(MotionEvent event, int historyPos) {
-
+    private void processJoystickInput(MotionEvent event, int historyPos) throws IOException {
         InputDevice mInputDevice = event.getDevice();
+        x = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_X, historyPos);
+        y = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_Y, historyPos);
+        z = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_Z, historyPos);
+        rz = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_RZ, historyPos);
+    }
 
-        // Calculate the horizontal distance to move by
-        // using the input value from one of these physical controls:
-        // the left control stick, hat axis, or the right control stick.
-        float x = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_X, historyPos);
-        if (x == 0) {
-            x = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_HAT_X, historyPos);
+    @Override
+    public boolean onGenericMotionEvent(MotionEvent event) {
+
+        // Check that the event came from a game controller
+        if ((event.getSource() & InputDevice.SOURCE_JOYSTICK) ==
+                InputDevice.SOURCE_JOYSTICK &&
+                event.getAction() == MotionEvent.ACTION_MOVE) {
+
+            // Process all historical movement samples in the batch
+            final int historySize = event.getHistorySize();
+
+            // Process the movements starting from the
+            // earliest historical position in the batch
+            for (int i = 0; i < historySize; i++) {
+                // Process the event at historical position i
+                try {
+                    processJoystickInput(event, i);
+                } catch (IOException ex) {
+                    System.out.println("Error loading history");
+                }
+            }
+            // Process the current movement sample in the batch (position -1)
+            try {
+                processJoystickInput(event, -1);
+            } catch (IOException ex) {
+                System.out.println("Error loading current");
+            }
+            Log.i("x", String.valueOf(x));
+            Log.i("y", String.valueOf(y));
+            Log.i("z", String.valueOf(z));
+            Log.i("rz", String.valueOf(rz));
+            return true;
         }
-        if (x == 0) {
-            x = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_Z, historyPos);
+        return super.onGenericMotionEvent(event);
+    }
+
+    class ServerThread implements Runnable {
+
+        public void run() {
+            Socket socket = null;
+            try {
+                server = new ServerSocket(8080);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            while (!Thread.currentThread().isInterrupted()) {
+                try {
+                    socket = server.accept();
+
+                    CommunicationThread commThread = new CommunicationThread(socket);
+                    new Thread(commThread).start();
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
         }
 
-        // Calculate the vertical distance to move by
-        // using the input value from one of these physical controls:
-        // the left control stick, hat switch, or the right control stick.
-        float y = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_Y, historyPos);
+        class CommunicationThread implements Runnable {
 
-        if (y == 0) {
-            y = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_HAT_Y, historyPos);
+            private Socket clientSocket;
+
+            PrintWriter out;
+
+            public CommunicationThread(Socket clientSocket) {
+
+                this.clientSocket = clientSocket;
+
+                try {
+                    out = new PrintWriter(clientSocket.getOutputStream(), true);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+
+            public void run() {
+
+                while (!Thread.currentThread().isInterrupted()) {
+                    String toClient = String.valueOf(x)+","+
+                            String.valueOf(y)+","+
+                            String.valueOf(z)+","+
+                            String.valueOf(rz)+","+
+                            String.valueOf(headRotate[0]*180/(Math.PI)+90)+","+
+                            String.valueOf(headRotate[1]*180/(Math.PI)+90);
+                    out.println(toClient);
+                    try {
+                        Thread.sleep(100);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+            }
+
         }
-        if (y == 0) {
-            y = getCenteredAxis(event, mInputDevice, MotionEvent.AXIS_RZ, historyPos);
-        }
-        // Update the ship object based on the new x and y values
     }
 }
