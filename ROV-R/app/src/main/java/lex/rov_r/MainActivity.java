@@ -23,15 +23,21 @@ import com.google.vrtoolkit.cardboard.HeadTransform;
 import com.google.vrtoolkit.cardboard.Viewport;
 
 import android.content.Context;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.net.Uri;
 import android.opengl.GLES20;
 import android.os.Bundle;
+import android.os.Environment;
 import android.os.Vibrator;
 import android.util.Log;
 import android.view.InputDevice;
 import android.view.MotionEvent;
+import android.view.View;
 
 import java.io.*;
 import java.net.*;
+import java.util.Date;
 
 import javax.microedition.khronos.egl.EGLConfig;
 
@@ -52,6 +58,7 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
 
     // store reference to CardboardVideoView
     private CardboardVideoView overlayView;
+    private CardboardOverlayView textView;
 
     // global variables for head-tracking/joystick data
     private double x;
@@ -88,6 +95,7 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
 
         // initialize reference to cardboardvideoview
         overlayView = (CardboardVideoView) findViewById(R.id.overlay);
+        textView = (CardboardOverlayView) findViewById(R.id.text);
 
         // start HTTP socket server thread
         this.serverThread = new Thread(new ServerThread());
@@ -162,7 +170,7 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
     @Override
     public void onCardboardTrigger() {
         Log.i(TAG, "onCardboardTrigger");
-
+        //takeScreenshot();
         // vibrate to signify that trigger has been activated (current no use, just for debug purposes)
         vibrator.vibrate(50);
     }
@@ -185,6 +193,36 @@ public class MainActivity extends CardboardActivity implements CardboardView.Ste
         }
         return 0;
     }
+
+    private void takeScreenshot() {
+        Date now = new Date();
+        android.text.format.DateFormat.format("yyyy-MM-dd_hh:mm:ss", now);
+
+        try {
+            // image naming and path  to include sd card  appending name you choose for file
+            String mPath = Environment.getExternalStorageDirectory().toString() + "/" + now + ".jpg";
+
+            // create bitmap screen capture
+            View v1 = getWindow().getDecorView().getRootView();
+            v1.setDrawingCacheEnabled(true);
+            Bitmap bitmap = Bitmap.createBitmap(v1.getDrawingCache());
+            v1.setDrawingCacheEnabled(false);
+
+            File imageFile = new File(mPath);
+
+            FileOutputStream outputStream = new FileOutputStream(imageFile);
+            int quality = 100;
+            bitmap.compress(Bitmap.CompressFormat.JPEG, quality, outputStream);
+            outputStream.flush();
+            outputStream.close();
+
+            textView.show3DToast("Screenshot taken!");
+        } catch (Throwable e) {
+            // Several error may come out with file handling or OOM
+            e.printStackTrace();
+        }
+    }
+
 
     private void processJoystickInput(MotionEvent event, int historyPos) throws IOException {
         // get device that created motionevent
